@@ -1,0 +1,441 @@
+
+
+"""
+Semana 11 — Búsqueda Lineal, Binaria y HITO 2
+Estructura de Datos Básica · UAN · LSC
+Dr. Eligardo Cruz Sánchez
+Equipo: [3]
+"""
+
+import time
+import random
+import copy
+import sys
+
+# ──────────────────────────────────────────────────────────────────────
+#  EVIDENCIAS DE COMPRENSIÓN (llenar ANTES de codificar)
+# ──────────────────────────────────────────────────────────────────────
+
+# COMPRENDE-1: Enuncia el invariante de búsqueda binaria con tus palabras.
+#              ¿Qué garantiza en cada iteración del bucle while?
+# [El invariante garantiza que el valor que estamos buscando se encuentra atrapado entre los índices izq y der.
+#   En cada vuelta del ciclo, al descartar la mitad del arreglo que no nos sirve, nos aseguramos de que el objetivo jamás se quede en la parte eliminada.]
+
+# COMPRENDE-2: ¿Cuántas comparaciones hace búsqueda binaria en el peor caso
+#              para n = 1 000 000? Muestra el cálculo: ⌊log₂(n)⌋ + 1
+# [ log_2(1,000,000) + 1 = 19.93 + 1 = 19 + 1 = 20 comparaciones]
+
+# COMPRENDE-3: ¿Por qué búsqueda binaria requiere arreglo ordenado?
+#              Da un contraejemplo concreto donde falla si no está ordenado.
+# [ Porque si los datos están desordenados, no puedes saber si lo que buscas está a la izquierda o a la derecha del centro.
+#     Por ejemplo, en [5, 9, 1, 3], si buscas el 3, el punto medio es 9. Como 3 < 9, el algoritmo irá a buscar a la izquierda ([5]) y dirá que el 3 no existe, ignorando que estaba a la derecha.]
+
+# ESTRATEGIA: Describe brevemente el plan del equipo para el HITO 2
+#             (qué algoritmo de ordenamiento eligieron del Veredicto y por qué)
+# [ Elegimos Merge Sort. Como el catálogo de StreamMX tiene millones de puntajes repetidos, Quick Sort Lomuto fallaría por Stack Overflow (colapso de memoria). 
+#     Merge Sort garantiza estabilidad y un tiempo O(n log n) seguro sin importar los duplicados]
+
+
+# ──────────────────────────────────────────────────────────────────────
+#  IMPORTAR CÓDIGO DE S9 Y S10
+#  (pegar aquí las implementaciones que ya pasaron sus pruebas)
+# ──────────────────────────────────────────────────────────────────────
+def _merge(arr, inicio, medio, fin):
+    izquierda = arr[inicio:medio + 1]
+    derecha = arr[medio + 1:fin + 1]
+    i = 0; j = 0; k = inicio
+    while i < len(izquierda) and j < len(derecha):
+        val_izq = izquierda[i][0] if isinstance(izquierda[i], (tuple, list)) else izquierda[i]
+        val_der = derecha[j][0] if isinstance(derecha[j], (tuple, list)) else derecha[j]
+        if val_izq <= val_der:
+            arr[k] = izquierda[i]; i += 1
+        else:
+            arr[k] = derecha[j]; j += 1
+        k += 1
+    while i < len(izquierda):
+        arr[k] = izquierda[i]; i += 1; k += 1
+    while j < len(derecha):
+        arr[k] = derecha[j]; j += 1; k += 1
+
+def _merge_sort_rec(arr, inicio, fin):
+    if inicio >= fin: return
+    medio = (inicio + fin) // 2
+    _merge_sort_rec(arr, inicio, medio)
+    _merge_sort_rec(arr, medio + 1, fin)
+    _merge(arr, inicio, medio, fin)
+
+def merge_sort(A):
+    """Implementación de Merge Sort Estable de la S9"""
+    if len(A) > 1:
+        _merge_sort_rec(A, 0, len(A) - 1)
+
+
+def elegir_pivote_mediana3(A, izq, der):
+    medio = (izq + der) // 2
+    val_izq = A[izq][0] if isinstance(A[izq], (tuple, list)) else A[izq]
+    val_med = A[medio][0] if isinstance(A[medio], (tuple, list)) else A[medio]
+    val_der = A[der][0] if isinstance(A[der], (tuple, list)) else A[der]
+    if val_izq > val_med: A[izq], A[medio] = A[medio], A[izq]
+    if val_izq > val_der: A[izq], A[der] = A[der], A[izq]
+    if val_med > val_der: A[medio], A[der] = A[der], A[medio]
+    A[medio], A[der] = A[der], A[medio]
+
+def particionar_lomuto(A, izq, der):
+    pivote = A[der][0] if isinstance(A[der], (tuple, list)) else A[der]
+    i = izq - 1
+    for j in range(izq, der):
+        val_j = A[j][0] if isinstance(A[j], (tuple, list)) else A[j]
+        if val_j <= pivote:
+            i += 1
+            A[i], A[j] = A[j], A[i]
+    A[i + 1], A[der] = A[der], A[i + 1]
+    return i + 1
+
+def _quick_sort_rec(A, izq, der):
+    if izq < der:
+        elegir_pivote_mediana3(A, izq, der)
+        p = particionar_lomuto(A, izq, der)
+        _quick_sort_rec(A, izq, p - 1)
+        _quick_sort_rec(A, p + 1, der)
+
+def quick_sort(A, izq=None, der=None):
+    """Implementación de Quick Sort con Mediana de Tres de la S10"""
+    if izq is None: izq = 0
+    if der is None: der = len(A) - 1
+    if len(A) > 1:
+        _quick_sort_rec(A, izq, der)
+
+
+# ──────────────────────────────────────────────────────────────────────
+#  SECCIÓN 1 — BÚSQUEDA LINEAL
+# ──────────────────────────────────────────────────────────────────────
+
+def busqueda_lineal(A, objetivo):
+    """
+    Recorre A de izquierda a derecha buscando objetivo.
+    Retorna el índice de la primera ocurrencia, o -1 si no existe.
+    No requiere que A esté ordenado.
+    Complejidad: O(n) tiempo, O(1) espacio.
+    """
+    # DECISIÓN: ¿Por qué iterar con enumerate en lugar de range?
+    # [ Porque enumerate nos da directamente tanto el índice como el valor del elemento en cada paso. 
+    #     Esto hace que el código de Python sea más limpio, rápido de leer y evita estar escribiendo A[i] a cada rato]
+
+    for indice, elemento in enumerate(A):
+        valor = elemento[0] if isinstance(elemento, (tuple, list)) else elemento
+        if valor == objetivo:
+            return indice
+    return -1
+
+# ──────────────────────────────────────────────────────────────────────
+#  SECCIÓN 2 — BÚSQUEDA BINARIA (iterativa)
+# ──────────────────────────────────────────────────────────────────────
+
+def busqueda_binaria(A, objetivo):
+    """
+    Búsqueda binaria iterativa sobre A ordenado ascendentemente.
+    Retorna el índice de una ocurrencia de objetivo, o -1 si no existe.
+    PRECONDICIÓN: A debe estar ordenado.
+    Complejidad: O(log n) tiempo, O(1) espacio.
+    """
+    # DECISIÓN: ¿Por qué usar mid = (izq + der) // 2 y no (izq + der) / 2?
+    # [ Porque los índices de las posiciones de un arreglo tienen que ser números enteros.
+    #      El operador / da un resultado con punto decimal (flotante), mientras que // trunca el resultado y nos da el número entero exacto que necesitamos.]
+
+    izq = 0
+    der = len(A) - 1
+
+    while izq <= der:
+        mid = izq + (der - izq) // 2
+        valor = A[mid][0] if isinstance(A[mid], (tuple, list)) else A[mid]
+        
+        if valor == objetivo:
+            return mid
+        elif valor < objetivo:
+            izq = mid + 1
+        else:
+            der = mid - 1
+
+    return -1
+
+
+def busqueda_primera_ocurrencia(A, objetivo):
+    izq, der = 0, len(A) - 1
+    resultado = -1
+    while izq <= der:
+        mid = izq + (der - izq) // 2
+        valor = A[mid][0] if isinstance(A[mid], (tuple, list)) else A[mid]
+        if valor == objetivo:
+            resultado = mid
+            der = mid - 1  # Forzamos confinamiento a la izquierda
+        elif valor < objetivo:
+            izq = mid + 1
+        else:
+            der = mid - 1
+    return resultado
+
+
+def busqueda_ultima_ocurrencia(A, objetivo):
+    izq, der = 0, len(A) - 1
+    resultado = -1
+    while izq <= der:
+        mid = izq + (der - izq) // 2
+        valor = A[mid][0] if isinstance(A[mid], (tuple, list)) else A[mid]
+        if valor == objetivo:
+            resultado = mid
+            izq = mid + 1  # Forzamos confinamiento a la derecha
+        elif valor < objetivo:
+            izq = mid + 1
+        else:
+            der = mid - 1
+    return resultado
+
+
+def buscar_rango(A, objetivo):
+    """Retorna los límites (primero, último) en O(log n) eliminando la expansión lineal."""
+    primera = busqueda_primera_ocurrencia(A, objetivo)
+    if primera == -1:
+        return (-1, -1)
+    ultima = busqueda_ultima_ocurrencia(A, objetivo)
+    return (primera, ultima)
+
+
+# ──────────────────────────────────────────────────────────────────────
+#  SECCIÓN 3 — BENCHMARK COMPARATIVO
+# ──────────────────────────────────────────────────────────────────────
+
+def generar_arreglo_ordenado(n):
+    """Genera un arreglo de n enteros ordenados (simulando catálogo ya ordenado)."""
+    return list(range(n))
+
+
+def medir_busqueda(funcion_busqueda, A, objetivo):
+    """
+    Ejecuta funcion_busqueda(A, objetivo) y retorna (tiempo_segundos, resultado).
+    No copia el arreglo — búsqueda no modifica A.
+    """
+    inicio = time.perf_counter()
+    resultado = funcion_busqueda(A, objetivo)
+    fin = time.perf_counter()
+    return fin - inicio, resultado
+
+
+def ejecutar_benchmark_busqueda():
+    """
+    Benchmark: búsqueda lineal vs binaria sobre arreglos ordenados.
+    Tres escenarios por tamaño: objetivo al inicio, al final, no existe.
+    """
+    tamanos = [1_000, 10_000, 100_000, 1_000_000]
+    escenarios = [
+        ('inicio',     lambda n: 0),           # mejor caso lineal, cualquiera binaria
+        ('final',      lambda n: n - 1),        # peor caso lineal
+        ('no_existe',  lambda n: n + 999),      # peor caso ambas
+    ]
+
+    print("=" * 90)
+    print(f"{'n':>10} | {'Escenario':>10} | {'Lineal (s)':>13} | {'Binaria (s)':>13} | {'Factor':>8}")
+    print("=" * 90)
+
+    for n in tamanos:
+        A = generar_arreglo_ordenado(n)
+        for nombre_esc, get_objetivo in escenarios:
+            objetivo = get_objetivo(n)
+            t_lin, res_lin = medir_busqueda(busqueda_lineal, A, objetivo)
+            t_bin, res_bin = medir_busqueda(busqueda_binaria, A, objetivo)
+
+            # Ajuste de validación para asegurar que coincidan conceptualmente los resultados
+            if res_lin != -1 and res_bin != -1:
+                assert A[res_lin] == A[res_bin], "Error de coincidencia lógica."
+            else:
+                assert res_lin == res_bin, (
+                    f"DISCREPANCIA: lineal={res_lin}, binaria={res_bin} "
+                    f"para n={n}, objetivo={objetivo}"
+                )
+
+            factor = t_lin / t_bin if t_bin > 0 else float('inf')
+            print(f"{n:>10} | {nombre_esc:>10} | {t_lin:>13.6f} | {t_bin:>13.6f} | {factor:>7.1f}x")
+        print("-" * 90)
+
+    # REFLEXIONA-1: ¿En qué escenario la diferencia de velocidad es mayor?
+    # [ La diferencia es gigantesca en los escenarios 'final' y 'no_existe' cuando el tamaño es de 1,000,000. 
+    #    La búsqueda lineal se tarda mucho porque revisa todo el millón de datos, mientras que la binaria responde de inmediato.]
+
+    # REFLEXIONA-2: ¿El "factor" de velocidad corresponde al ratio O(n)/O(log n)?
+    #               Calculen el valor teórico para n=1_000_000: n / log2(n) ≈ ?
+    # [ Sí corresponde. El cálculo teórico es $1,000,000 / 20 = 50,000\text{x}$ de aceleración potencial.
+    #    En los resultados de la consola vemos números de ese impacto, lo que demuestra la ventaja de la teoría en la práctica]
+
+    # REFLEXIONA-3: ¿Qué pasa si buscan el objetivo al INICIO con búsqueda lineal
+    #               vs búsqueda binaria? ¿Cuál es más rápida y por qué?
+    # [ Si el elemento está al mero 'inicio', la búsqueda lineal es ligeramente más rápida porque lo encuentra en su primer intento O(1).
+    #     La binaria tarda un poquito más porque por regla tiene que ir a calcular el centro y hacer un par de brincos antes de llegar al inicio]
+
+
+def ejecutar_benchmark_duplicados():
+    """
+    Benchmark de conflicto cognitivo — Área crítica de StreamMX:
+    Distribución C tiene millones de registros con el mismo puntaje.
+    Mide el tiempo de buscar_por_puntaje con expansión lineal vs el rango
+    que alcanzaría buscar_rango (Reto 6) sobre un arreglo con duplicados masivos.
+    Objetivo: observar empíricamente la degradación a O(n) en el caso crítico.
+    """
+    import math
+
+    print("\n" + "=" * 75)
+    print("BENCHMARK DUPLICADOS MASIVOS — Distribución C de StreamMX")
+    print("buscar_por_puntaje (expansión lineal) sobre distintas proporciones")
+    print("=" * 75)
+    print(f"{'n':>10} | {'% duplicados':>13} | {'buscar_por_puntaje (s)':>22} | {'Observación'}")
+    print("-" * 75)
+
+    casos = [
+        (10_000,   10),    # 1 000 duplicados del mismo valor
+        (10_000,   50),    # 5 000 duplicados — la mitad del arreglo
+        (100_000,  50),    # 50 000 duplicados
+        (100_000,  90),    # 90 000 duplicados — caso casi degenerado
+    ]
+
+    for n, pct in casos:
+        num_dup = int(n * pct / 100)
+        # Adaptación del arreglo simulado para soportar tuplas o enteros de forma genérica
+        A = sorted([(500, "Peli", "MX")] * num_dup + [(i, "Peli", "MX") for i in range(501, 501 + (n - num_dup))])
+        t_inicio = time.perf_counter()
+        resultados = buscar_por_puntaje(A, 500)
+        t_fin = time.perf_counter()
+        t = t_fin - t_inicio
+        obs = "⚠️ LENTO" if t > 0.005 else "OK"
+        print(f"{n:>10} | {pct:>12}% | {t:>22.6f} | {obs}")
+
+    print("-" * 75)
+    print()
+    # REFLEXIONA-DUPLICADOS: ¿Cómo cambia el tiempo conforme aumenta el % de duplicados?
+    # ¿Qué relación tiene esto con la degradación de O(log n) a O(n)?
+    # ¿Por qué el Reto 6 (buscar_rango) resuelve este problema?
+    # [  El tiempo aumenta mucho a medida que hay más datos repetidos porque la expansión hacia los lados es lineal. 
+    #     Esto hace que la búsqueda binaria pierda su velocidad O(log n) y se vuelva lenta (O(n)).
+    #       El Reto 6 lo resuelve porque usa dos búsquedas binarias para hallar los extremos del bloque repetido, manteniendo todo en tiempo logarítmico puro.]
+
+
+# ──────────────────────────────────────────────────────────────────────
+#  SECCIÓN 4 — PIPELINE HITO 2
+# ──────────────────────────────────────────────────────────────────────
+
+# Datos StreamMX simplificados: (puntaje_compuesto, titulo, id_pelicula)
+catalogo_streamx = [
+    (8.2, "Interestelar",    "MX-001"),
+    (7.5, "El Laberinto",    "MX-002"),
+    (9.1, "Origen",          "MX-003"),
+    (6.8, "Dune Parte 1",    "MX-004"),
+    (8.7, "Oppenheimer",     "MX-005"),
+    (7.5, "La Señal",        "MX-006"),
+    (9.4, "Everything E.E.", "MX-007"),
+    (6.2, "Los Elegidos",    "MX-008"),
+    (8.0, "The Batman",      "MX-009"),
+    (7.5, "Gravedad",        "MX-010"),
+    (9.0, "Parasite",        "MX-011"),
+    (7.1, "Midsommar",       "MX-012"),
+]
+
+
+def ordenar_catalogo(catalogo, algoritmo='veredicto'):
+    """
+    Ordena el catálogo StreamMX por puntaje_compuesto (campo 0).
+    algoritmo: 'merge_sort' | 'quick_sort' | 'veredicto'
+    'veredicto' usa el algoritmo recomendado por el equipo en S10.
+    """
+    copia = copy.deepcopy(catalogo)
+
+    # DECISIÓN: ¿Qué algoritmo eligió el equipo en el Veredicto StreamMX de S10?
+    # Justificar aquí por qué este algoritmo es apropiado para esta distribución.
+    # [ Elegimos Merge Sort porque el catálogo real tiene empates masivos de calificaciones.
+    #     Este algoritmo respeta el orden original de las películas con igual puntaje (es estable) y su consumo de RAM es predecible, evitando caídas del sistema.]
+
+    if algoritmo == 'merge_sort' or algoritmo == 'veredicto':
+        merge_sort(copia)
+    elif algoritmo == 'quick_sort':
+        quick_sort(copia)
+
+    return copia
+
+
+def buscar_por_puntaje(catalogo_ordenado, puntaje_objetivo):
+    """
+    Busca películas en el catálogo ordenado con el puntaje exacto.
+    Usa el sistema eficiente buscar_rango O(log n) para extraer los duplicados en rebanadas.
+    """
+    primera, ultima = buscar_rango(catalogo_ordenado, puntaje_objetivo)
+    if primera == -1:
+        return []
+    return catalogo_ordenado[primera:ultima + 1]
+
+
+def pipeline_hito2(catalogo, puntaje_buscar, algoritmo='veredicto'):
+    """
+    Pipeline completo HITO 2:
+    1. Ordenar catálogo con el algoritmo del Veredicto StreamMX.
+    2. Buscar películas con el puntaje dado usando búsqueda binaria.
+    3. Retornar resultados y métricas de tiempo.
+    """
+    # Paso 1: Ordenar
+    inicio_orden = time.perf_counter()
+    catalogo_ordenado = ordenar_catalogo(catalogo, algoritmo)
+    fin_orden = time.perf_counter()
+    t_orden = fin_orden - inicio_orden
+
+    # Paso 2: Buscar
+    inicio_busqueda = time.perf_counter()
+    resultados = buscar_por_puntaje(catalogo_ordenado, puntaje_buscar)
+    fin_busqueda = time.perf_counter()
+    t_busqueda = fin_busqueda - inicio_busqueda
+
+    return {
+        'catalogo_ordenado': catalogo_ordenado,
+        'resultados': resultados,
+        't_orden_s': t_orden,
+        't_busqueda_s': t_busqueda,
+        't_total_s': t_orden + t_busqueda,
+    }
+
+
+if __name__ == "__main__":
+    print("=" * 60)
+    print("PRUEBAS BÁSICAS — Sección 1 y 2")
+    print("=" * 60)
+
+    # Prueba búsqueda lineal
+    A = [3, 1, 4, 1, 5, 9, 2, 6]
+    assert busqueda_lineal(A, 5) == 4, "Lineal: error en búsqueda exitosa"
+    assert busqueda_lineal(A, 7) == -1, "Lineal: error en búsqueda fallida"
+    print("Búsqueda lineal: OK")
+
+    # Prueba búsqueda binaria
+    B = sorted(A)  # [1, 1, 2, 3, 4, 5, 6, 9]
+    idx = busqueda_binaria(B, 5)
+    assert idx != -1 and B[idx] == 5, "Binaria: error en búsqueda exitosa"
+    assert busqueda_binaria(B, 7) == -1, "Binaria: error en búsqueda fallida"
+    print("Búsqueda binaria: OK")
+
+    print("\n" + "=" * 60)
+    print("BENCHMARK — Sección 3")
+    print("=" * 60)
+    ejecutar_benchmark_busqueda()
+
+    print("\n" + "=" * 60)
+    print("BENCHMARK DUPLICADOS — Sección 3b")
+    print("=" * 60)
+    ejecutar_benchmark_duplicados()
+
+    print("\n" + "=" * 60)
+    print("PIPELINE HITO 2 — Sección 4")
+    print("=" * 60)
+    resultado = pipeline_hito2(catalogo_streamx, puntaje_buscar=7.5)
+    print(f"Catálogo ordenado (primeros 5): {resultado['catalogo_ordenado'][:5]}")
+    print(f"Películas con puntaje 7.5: {resultado['resultados']}")
+    print(f"Tiempo ordenar:  {resultado['t_orden_s']:.6f} s")
+    print(f"Tiempo buscar:   {resultado['t_busqueda_s']:.6f} s")
+    print(f"Tiempo total:    {resultado['t_total_s']:.6f} s")
+
+    # VALIDA: ¿El pipeline retorna correctamente las 3 películas con puntaje 7.5?
+    # [ Sí, el pipeline retorna exactamente las 3 películas ("El Laberinto", "La Señal" y "Gravedad").
+    #    Esto cumple con lo que pidió la Ing. Sofía porque el catálogo se ordena correctamente y
+    #      la búsqueda encuentra todos los resultados usando apenas unas cuantas operaciones en el servidor]
